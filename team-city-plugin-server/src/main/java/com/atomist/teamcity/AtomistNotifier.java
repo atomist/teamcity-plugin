@@ -1,5 +1,6 @@
 package com.atomist.teamcity;
 
+import com.google.gson.Gson;
 import com.intellij.openapi.diagnostic.Logger;
 import jetbrains.buildServer.notification.NotificatorAdapter;
 import jetbrains.buildServer.notification.NotificatorRegistry;
@@ -20,10 +21,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class AtomistNotifier extends NotificatorAdapter {
 
@@ -55,6 +53,12 @@ public class AtomistNotifier extends NotificatorAdapter {
         return NOTIFIER_TYPE;
     }
 
+    @NotNull
+    @Override
+    public String getDisplayName() {
+        return "Atomist";
+    }
+
     @Override
     public void notifyBuildStarted(@NotNull SRunningBuild build, @NotNull Set<SUser> users) {
         sendAtomistWebhook(build, users, PHASE_STARTED, STATUS_STARTED);
@@ -82,22 +86,19 @@ public class AtomistNotifier extends NotificatorAdapter {
             say("Hello Notificator World, specifically " + user.getUsername());
             CloseableHttpClient client = HttpClients.createDefault();
 
+            // gather settings from where the user activated the notification. To change these in TC:
+            // click on my name; click Notification Rules on the left nav;
+            // click Atomist underneath the Notification Rules heading.
             String teamId = user.getPropertyValue(new NotificatorPropertyKey(NOTIFIER_TYPE, ATOMIST_TEAM_ID));
             String baseUrl = user.getPropertyValue(new NotificatorPropertyKey(NOTIFIER_TYPE, TEAM_CITY_BASE_URL));
             say("Team ID:" + teamId);
             say("Base URL:" + baseUrl);
-            String atomistUrl = ATOMIST_BASE_URL + teamId;
-            HttpPost httpPost = new HttpPost(atomistUrl);
 
-
+            // Gather data out of the build.
             long duration = build.getDuration();
             String buildNumber = build.getBuildNumber();
-            long buildId = build.getBuildId();
-            String buildType = build.getBuildType().getBuildTypeId();
 
-            String buildUrl = baseUrl + "/viewLog.html?buildId=" + buildId + "&buildTypeId=" + buildType + "&tab=buildLog";
-
-            // TODO: use JSON encoder
+            String buildUrl = constructBuildUrl(baseUrl, build);
 
             List<BuildRevision> revisions = build.getRevisions();
             if (revisions.size() != 1) {
@@ -107,31 +108,38 @@ public class AtomistNotifier extends NotificatorAdapter {
             BuildRevision revision = revisions.get(0);
 
             String branch = stripBranchPrefixes(getFullBranch(build, revision.getRoot(), buildUrl));
-
-            say("The name of the VCS root is: " + revision.getRoot().getName());
-            say("The display name of the VCS root is: " + revision.getRoot().getVcsDisplayName());
             String gitUrl = getRepoUrl(revision.getRoot());
             String sha = revision.getRevision();
 
-            String scm = "{\"url\": \"" + gitUrl + "\", \"branch\": \"" + branch + "\", \"commit\": \"" + sha + "\"}";
+            // Put it all together
+            HashMap<String, String> scm = new HashMap<>();
+            scm.put("url", gitUrl);
+            scm.put("branch", branch);
+            scm.put("commit", sha);
 
+            HashMap<String, Object> buildPayload = new HashMap<>();
+            buildPayload.put("number", buildNumber);
+            buildPayload.put("phase", phase);
+            buildPayload.put("status", status);
+            buildPayload.put("full_url", buildUrl);
+            buildPayload.put("scm", scm);
 
-            String payload = "{\"name\": \"" + branch +
-                    "\", \"duration\": " + duration +
-                    ", \"build\": {\"number\": \"" + buildNumber +
-                    "\", \"phase\": \"" + phase +
-                    "\", \"status\": \"" + status +
-                    "\", \"full_url\": \"" + buildUrl + "\", \"scm\": " + scm + "}}";
-            say("Sending to atomist: " + payload);
+            HashMap<String, Object> payload = new HashMap<>();
+            payload.put("name", branch);
+            payload.put("duration", duration);
+            payload.put("build", build);
 
-            //  {"name": "jellyfish", "duration": 0,
-            // "build": {"number": "37", "phase": "STARTED", "status": "STARTED",
-            //     "full_url": "http://localhost:8111/viewLog.html?buildId=46&buildTypeId=bt1&tab=buildLog",
-            // "scm": {"url": "https://github.com/satellite-of-love/carrot", "branch": "jellyfish",
-            // "commit": "f05c0f8843c661e66bac9a3f8a07b14ec70d10f8"}}}
+            // serialize
+            Gson gson = new Gson();
+            String jsonPayload = gson.toJson(payload);
+            say("Sending to atomist: " + jsonPayload);
 
+            // transmit
             try {
-                StringEntity entity = new StringEntity(payload);
+                String atomistUrl = ATOMIST_BASE_URL + teamId;
+                HttpPost httpPost = new HttpPost(atomistUrl);
+
+                StringEntity entity = new StringEntity(jsonPayload);
                 httpPost.setEntity(entity);
                 httpPost.setHeader("Accept", "application/json");
                 httpPost.setHeader("Content-type", "application/json");
@@ -139,14 +147,18 @@ public class AtomistNotifier extends NotificatorAdapter {
                 CloseableHttpResponse response = client.execute(httpPost);
                 say(EntityUtils.toString(response.getEntity()));
                 client.close();
-            } catch (UnsupportedEncodingException e) {
-                System.err.println("Failed to encode json: " + payload);
-                e.printStackTrace();
             } catch (IOException e) {
                 System.out.println("IO exception when posting" + e.getMessage());
                 e.printStackTrace();
             }
         });
+    }
+
+    private String constructBuildUrl(String baseUrl, SBuild build) {
+        long buildId = build.getBuildId();
+        String buildType = build.getBuildType().getBuildTypeId();
+
+        return baseUrl + "/viewLog.html?buildId=" + buildId + "&buildTypeId=" + buildType + "&tab=buildLog";
     }
 
     /*
@@ -182,25 +194,5 @@ public class AtomistNotifier extends NotificatorAdapter {
         System.out.println(message); // TODO: figure out how to log
     }
 
-    @NotNull
-    @Override
-    public String getDisplayName() {
-        return "Atomist";
-    }
 
-    public static final String PREFIX = "build.revisions.";
-
-    // https://github.com/pwielgolaski/teamcity-revisions/blob/master/src/main/java/jetbrains/buildServer/revisions/RevisionsParametersProvider.java
-
-
-    private void processRevision(VcsRootInstance root, BuildRevision revision, Map<String, String> result, boolean includeId) {
-        String prefix = PREFIX + (includeId ? root.getName() + "." : "");
-        String revisionText = revision != null ? revision.getRevision() : "???";
-        result.put(prefix + "revision", revisionText);
-        result.put(prefix + "short", isGitRepo(root) ? revisionText.substring(0, Math.min(revisionText.length(), 7)) : "N/A");
-    }
-
-    private boolean isGitRepo(VcsRootInstance root) {
-        return root != null && "jetbrains.git".equalsIgnoreCase(root.getVcsName());
-    }
 }
