@@ -33,12 +33,6 @@ public class AtomistNotifier extends NotificatorAdapter {
     public static String NOTIFIER_TYPE = "atomist-notifier";
     public static String ATOMIST_BASE_URL = "https://webhook.atomist.com/atomist/jenkins/teams/";
 
-    private static String PHASE_STARTED = "STARTED";
-    private static String PHASE_FINALIZED = "FINALIZED";
-
-    private static String STATUS_STARTED = "STARTED";
-    private static String STATUS_FAILURE = "FAILURE";
-    private static String STATUS_SUCCESS = "SUCCESS";
 
     public AtomistNotifier(NotificatorRegistry notificatorRegistry) throws IOException {
         ArrayList<UserPropertyInfo> userProps = new ArrayList<>();
@@ -61,23 +55,23 @@ public class AtomistNotifier extends NotificatorAdapter {
 
     @Override
     public void notifyBuildStarted(@NotNull SRunningBuild build, @NotNull Set<SUser> users) {
-        sendAtomistWebhook(build, users, PHASE_STARTED, STATUS_STARTED);
+        sendAtomistWebhook(build, users, BuildReport.PHASE_STARTED, BuildReport.STATUS_STARTED);
     }
 
     @Override
     public void notifyBuildFailed(@NotNull SRunningBuild build, @NotNull Set<SUser> users) {
-        sendAtomistWebhook(build, users, PHASE_FINALIZED, STATUS_FAILURE);
+        sendAtomistWebhook(build, users, BuildReport.PHASE_FINALIZED, BuildReport.STATUS_FAILURE);
     }
 
     @Override
     public void notifyBuildFailedToStart(@NotNull SRunningBuild build, @NotNull Set<SUser> users) {
         // TODO: distinguish this from failure somehow
-        sendAtomistWebhook(build, users, PHASE_FINALIZED, STATUS_FAILURE);
+        sendAtomistWebhook(build, users, BuildReport.PHASE_FINALIZED, BuildReport.STATUS_FAILURE);
     }
 
     @Override
     public void notifyBuildSuccessful(@NotNull SRunningBuild build, @NotNull Set<SUser> users) {
-        sendAtomistWebhook(build, users, PHASE_FINALIZED, STATUS_SUCCESS);
+        sendAtomistWebhook(build, users, BuildReport.PHASE_FINALIZED, BuildReport.STATUS_SUCCESS);
     }
 
     private void sendAtomistWebhook(@NotNull SRunningBuild build, @NotNull Set<SUser> users,
@@ -112,22 +106,10 @@ public class AtomistNotifier extends NotificatorAdapter {
             String sha = revision.getRevision();
 
             // Put it all together
-            HashMap<String, String> scm = new HashMap<>();
-            scm.put("url", gitUrl);
-            scm.put("branch", branch);
-            scm.put("commit", sha);
 
-            HashMap<String, Object> buildPayload = new HashMap<>();
-            buildPayload.put("number", buildNumber);
-            buildPayload.put("phase", phase);
-            buildPayload.put("status", status);
-            buildPayload.put("full_url", buildUrl);
-            buildPayload.put("scm", scm);
-
-            HashMap<String, Object> payload = new HashMap<>();
-            payload.put("name", branch);
-            payload.put("duration", duration);
-            payload.put("build", build);
+            GitInfo scm = new GitInfo(gitUrl, branch, sha);
+            BuildReport buildPayload = new BuildReport(buildNumber, phase, status, buildUrl, scm);
+            AtomistWebhookPayload payload = new AtomistWebhookPayload(branch, duration, buildPayload);
 
             // serialize
             Gson gson = new Gson();
@@ -195,4 +177,51 @@ public class AtomistNotifier extends NotificatorAdapter {
     }
 
 
+    static class GitInfo {
+        GitInfo(String url, String branch, String commit) {
+            this.url = url;
+            this.branch = branch;
+            this.commit = commit;
+        }
+
+        final String url;
+        final String branch;
+        final String commit;
+    }
+
+    static class BuildReport {
+        private static String PHASE_STARTED = "STARTED";
+        private static String PHASE_FINALIZED = "FINALIZED";
+
+        private static String STATUS_STARTED = "STARTED";
+        private static String STATUS_FAILURE = "FAILURE";
+        private static String STATUS_SUCCESS = "SUCCESS";
+
+        BuildReport(String number, String phase, String status, String full_url, GitInfo scm) {
+            this.number = number;
+            this.phase = phase;
+            this.status = status;
+            this.full_url = full_url;
+            this.scm = scm;
+        }
+
+        String number;
+        String phase;
+        String status;
+        String full_url;
+        GitInfo scm;
+    }
+
+    static class AtomistWebhookPayload {
+
+        AtomistWebhookPayload(String name, long duration, BuildReport build) {
+            this.name = name;
+            this.duration = duration;
+            this.build = build;
+        }
+
+        String name;
+        long duration;
+        BuildReport build;
+    }
 }
