@@ -20,8 +20,9 @@ import org.apache.http.util.EntityUtils;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 public class AtomistNotifier extends NotificatorAdapter {
 
@@ -172,8 +173,8 @@ public class AtomistNotifier extends NotificatorAdapter {
     }
 
     private void say(String message) {
-        LOG.info(message);
-        System.out.println(message); // TODO: figure out how to log
+        LOG.info(message); // this doesn't work. I have not found the log4j incantation to make it work.
+        System.out.println(message); // this appears in catalina.out in the TC server's log directory
     }
 
 
