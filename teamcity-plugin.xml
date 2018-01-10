@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<teamcity-plugin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:schemas-jetbrains-com:teamcity-plugin-v1-xml">
+  <info>
+    <name>atomist-team-city-plugin</name>
+    <display-name>atomist</display-name>
+    <version>@Version@</version>
+    <description>Send build events to atomist</description>
+    <download-url>Plugin download URL</download-url>
+    <email>jessitron@atomist.com</email>
+    <vendor>
+      <name>Atomist</name>
+      <url>http://atomist.com</url>
+      <logo>https://docs.atomist.com/img/atomist-logo.png</logo>
+    </vendor>
+  </info>
+  <deployment use-separate-classloader="true" />
+</teamcity-plugin>
