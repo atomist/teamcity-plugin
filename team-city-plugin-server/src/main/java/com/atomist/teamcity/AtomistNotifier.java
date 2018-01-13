@@ -103,7 +103,8 @@ public class AtomistNotifier extends NotificatorAdapter {
             }
             BuildRevision revision = revisions.get(0);
 
-            String branch = stripBranchPrefixes(getFullBranch(build, revision.getRoot(), buildUrl));
+            String teamCityBranchName = getFullBranch(build, revision.getRoot(), buildUrl);
+            String branch = stripBranchPrefixes(teamCityBranchName);
             String gitUrl = getRepoUrl(revision.getRoot());
             String sha = revision.getRevision();
 
@@ -111,7 +112,7 @@ public class AtomistNotifier extends NotificatorAdapter {
 
             GitInfo scm = new GitInfo(gitUrl, branch, sha);
             BuildReport buildPayload = new BuildReport(buildNumber, phase, status, buildUrl, scm);
-            AtomistWebhookPayload payload = new AtomistWebhookPayload(branch, duration, buildPayload);
+            AtomistWebhookPayload payload = new AtomistWebhookPayload(teamCityBranchName, duration, buildPayload);
 
             // serialize
             Gson gson = new Gson();
