@@ -10,6 +10,7 @@ import jetbrains.buildServer.serverSide.SRunningBuild;
 import jetbrains.buildServer.serverSide.UserPropertyInfo;
 import jetbrains.buildServer.users.NotificatorPropertyKey;
 import jetbrains.buildServer.users.SUser;
+import jetbrains.buildServer.vcs.VcsException;
 import jetbrains.buildServer.vcs.VcsRootInstance;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -139,7 +140,13 @@ public class AtomistNotifier extends NotificatorAdapter {
 
     private String constructBuildUrl(String baseUrl, SBuild build) {
         long buildId = build.getBuildId();
-        String buildType = build.getBuildType().getBuildTypeId();
+//        String buildType = build.getBuildType().getBuildTypeId();
+//        say("extended full name: " + build.getBuildType().getExtendedFullName());
+//        say("full name: " + build.getBuildType().getFullName());
+//        say("extended name: " + build.getBuildType().getExtendedName());
+//        say("build type ID " + build.getBuildTypeId());
+//        say("build type name " + build.getBuildTypeName());
+        String buildType = build.getBuildTypeExternalId(); // Finally found it!
 
         return baseUrl + "/viewLog.html?buildId=" + buildId + "&buildTypeId=" + buildType + "&tab=buildLog";
     }
