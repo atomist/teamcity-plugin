@@ -103,10 +103,12 @@ public class AtomistNotifier extends NotificatorAdapter {
             }
             BuildRevision revision = revisions.get(0);
 
-            String teamCityBranchName = getFullBranch(build, revision.getRoot(), buildUrl);
+            String teamCityBranchName = getFullBranch(build, revision.getRoot());
             String branch = stripBranchPrefixes(teamCityBranchName);
             String gitUrl = getRepoUrl(revision.getRoot());
             String sha = revision.getRevision();
+
+
 
             // Put it all together
 
@@ -141,12 +143,17 @@ public class AtomistNotifier extends NotificatorAdapter {
 
     private String constructBuildUrl(String baseUrl, SBuild build) {
         long buildId = build.getBuildId();
-//        String buildType = build.getBuildType().getBuildTypeId();
 //        say("extended full name: " + build.getBuildType().getExtendedFullName());
 //        say("full name: " + build.getBuildType().getFullName());
 //        say("extended name: " + build.getBuildType().getExtendedName());
 //        say("build type ID " + build.getBuildTypeId());
 //        say("build type name " + build.getBuildTypeName());
+//        say("build full name " + build.getFullName());
+//        say("build description" + build.getBuildDescription());
+//        say("build branch name" + build.getBranch().getName());
+//        say("build branch display name" + build.getBranch().getDisplayName());
+//        say("build agent name" + build.getAgentName());
+
         String buildType = build.getBuildTypeExternalId(); // Finally found it!
 
         return baseUrl + "/viewLog.html?buildId=" + buildId + "&buildTypeId=" + buildType + "&tab=buildLog";
@@ -155,16 +162,16 @@ public class AtomistNotifier extends NotificatorAdapter {
     /*
      * Guess the branch name. Might be like /refs/heads/master or /refs/pull/25/merge or might be shorter.
      */
-    private String getFullBranch(SBuild build, VcsRootInstance vcsRoot, String buildUrl) {
+    private String getFullBranch(SBuild build, VcsRootInstance vcsRoot) {
+//        say("The vcsRoot branch is: " + vcsRoot.getProperty("branch"));
+//        say("the build branch is: " + build.getBranch().getName());
+
+        vcsRoot.getProperties().forEach((k,v) -> say(k + "=" + v));
         if (build.getBranch().isDefaultBranch()) {
-            // example: https://github.com/satellite-of-love/carrot#refs/heads/master
-            String[] splitOnPound = vcsRoot.getName().split("#");
-            if (splitOnPound.length != 2) {
-                say("Warning: unable to parse branch from " + vcsRoot.getName() + " on " + buildUrl);
-                return "master"; // it's a fine guess
-            } else {
-                return splitOnPound[1];
+            if (vcsRoot.getProperty("branch") == null) {
+                say("Warning: no branch property on vcsRoot " + vcsRoot.getName());
             }
+            return vcsRoot.getProperty("branch", "master");
         } else {
             return build.getBranch().getName();
         }
@@ -177,7 +184,10 @@ public class AtomistNotifier extends NotificatorAdapter {
     }
 
     private String getRepoUrl(VcsRootInstance vcsRoot) {
-        return vcsRoot.getName().replaceFirst("#.*$", "");
+        if (vcsRoot.getProperty("url") == null) {
+            say("Warning: no branch property on vcsRoot " + vcsRoot.getName());
+        }
+        return vcsRoot.getProperty("url");
     }
 
     private void say(String message) {
