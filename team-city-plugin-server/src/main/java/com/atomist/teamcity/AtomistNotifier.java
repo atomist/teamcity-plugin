@@ -10,7 +10,6 @@ import jetbrains.buildServer.serverSide.SRunningBuild;
 import jetbrains.buildServer.serverSide.UserPropertyInfo;
 import jetbrains.buildServer.users.NotificatorPropertyKey;
 import jetbrains.buildServer.users.SUser;
-import jetbrains.buildServer.vcs.VcsException;
 import jetbrains.buildServer.vcs.VcsRootInstance;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -166,7 +165,7 @@ public class AtomistNotifier extends NotificatorAdapter {
 //        say("The vcsRoot branch is: " + vcsRoot.getProperty("branch"));
 //        say("the build branch is: " + build.getBranch().getName());
 
-        vcsRoot.getProperties().forEach((k,v) -> say(k + "=" + v));
+       // vcsRoot.getProperties().forEach((k,v) -> say(k + "=" + v));
         if (build.getBranch().isDefaultBranch()) {
             if (vcsRoot.getProperty("branch") == null) {
                 say("Warning: no branch property on vcsRoot " + vcsRoot.getName());
