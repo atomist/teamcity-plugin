@@ -32,7 +32,7 @@ public class AtomistNotifier extends NotificatorAdapter {
     public static String TEAM_CITY_BASE_URL = "TEAM_CITY_BASE_URL";
 
     public static String NOTIFIER_TYPE = "atomist-notifier";
-    public static String ATOMIST_BASE_URL = "https://webhook.atomist.com/atomist/jenkins/teams/";
+    public static String ATOMIST_BASE_URL = "https://webhook.atomist.com/atomist/build/teams/";
 
 
     public AtomistNotifier(NotificatorRegistry notificatorRegistry) throws IOException {
@@ -56,27 +56,26 @@ public class AtomistNotifier extends NotificatorAdapter {
 
     @Override
     public void notifyBuildStarted(@NotNull SRunningBuild build, @NotNull Set<SUser> users) {
-        sendAtomistWebhook(build, users, BuildReport.PHASE_STARTED, BuildReport.STATUS_STARTED);
+        sendAtomistWebhook(build, users, BuildReport.STATUS_STARTED);
     }
 
     @Override
     public void notifyBuildFailed(@NotNull SRunningBuild build, @NotNull Set<SUser> users) {
-        sendAtomistWebhook(build, users, BuildReport.PHASE_FINALIZED, BuildReport.STATUS_FAILURE);
+        sendAtomistWebhook(build, users,BuildReport.STATUS_FAILURE);
     }
 
     @Override
     public void notifyBuildFailedToStart(@NotNull SRunningBuild build, @NotNull Set<SUser> users) {
-        // TODO: distinguish this from failure somehow
-        sendAtomistWebhook(build, users, BuildReport.PHASE_FINALIZED, BuildReport.STATUS_FAILURE);
+        sendAtomistWebhook(build, users, BuildReport.STATUS_ERROR);
     }
 
     @Override
     public void notifyBuildSuccessful(@NotNull SRunningBuild build, @NotNull Set<SUser> users) {
-        sendAtomistWebhook(build, users, BuildReport.PHASE_FINALIZED, BuildReport.STATUS_SUCCESS);
+        sendAtomistWebhook(build, users, BuildReport.STATUS_SUCCESS);
     }
 
     private void sendAtomistWebhook(@NotNull SRunningBuild build, @NotNull Set<SUser> users,
-                                    String phase, String status) {
+                                    String status) {
         users.forEach((user) -> {
             say("Hello Notificator World, specifically " + user.getUsername());
             CloseableHttpClient client = HttpClients.createDefault();
@@ -90,8 +89,7 @@ public class AtomistNotifier extends NotificatorAdapter {
             say("Base URL:" + baseUrl);
 
             // Gather data out of the build.
-            long duration = build.getDuration();
-            String buildNumber = build.getBuildNumber();
+            int buildNumber = Integer.parseInt(build.getBuildNumber());
 
             String buildUrl = constructBuildUrl(baseUrl, build);
 
@@ -103,26 +101,29 @@ public class AtomistNotifier extends NotificatorAdapter {
             BuildRevision revision = revisions.get(0);
 
             String teamCityBranchName = getFullBranch(build, revision.getRoot());
-            String branch = stripBranchPrefixes(teamCityBranchName);
-            String gitUrl = getRepoUrl(revision.getRoot());
+            String buildTrigger = teamCityBranchName.contains("pulls") ? BuildReport.TYPE_PULL_REQUEST : BuildReport.TYPE_PUSH;
+            Integer prNumber = buildTrigger.equals(BuildReport.TYPE_PULL_REQUEST) ? Integer.parseInt(stripBranchPrefixes(teamCityBranchName)) : null;
+            String branch = buildTrigger.equals(BuildReport.TYPE_PUSH) ? stripBranchPrefixes(teamCityBranchName) : null;
             String sha = revision.getRevision();
-
+            String buildName = build.getBuildTypeExternalId();
+            String buildId = "" + build.getBuildId();
 
 
             // Put it all together
 
-            GitInfo scm = new GitInfo(gitUrl, branch, sha);
-            BuildReport buildPayload = new BuildReport(buildNumber, phase, status, buildUrl, scm);
-            AtomistWebhookPayload payload = new AtomistWebhookPayload(teamCityBranchName, duration, buildPayload);
+            GenericBuildRepository scm = GenericBuildRepository.fromUrl(getRepoUrl(revision.getRoot()));
+            BuildReport buildPayload = new BuildReport(buildId, buildName, buildNumber, buildTrigger,
+                    prNumber, branch, buildUrl, status, sha, scm);
 
             // serialize
             Gson gson = new Gson();
-            String jsonPayload = gson.toJson(payload);
+            String jsonPayload = gson.toJson(buildPayload);
             say("Sending to atomist: " + jsonPayload);
 
             // transmit
             try {
                 String atomistUrl = ATOMIST_BASE_URL + teamId;
+                say("url: " + atomistUrl);
                 HttpPost httpPost = new HttpPost(atomistUrl);
 
                 StringEntity entity = new StringEntity(jsonPayload);
@@ -165,7 +166,7 @@ public class AtomistNotifier extends NotificatorAdapter {
 //        say("The vcsRoot branch is: " + vcsRoot.getProperty("branch"));
 //        say("the build branch is: " + build.getBranch().getName());
 
-       // vcsRoot.getProperties().forEach((k,v) -> say(k + "=" + v));
+        vcsRoot.getProperties().forEach((k,v) -> say(k + "=" + v));
         if (build.getBranch().isDefaultBranch()) {
             if (vcsRoot.getProperty("branch") == null) {
                 say("Warning: no branch property on vcsRoot " + vcsRoot.getName());
@@ -195,51 +196,78 @@ public class AtomistNotifier extends NotificatorAdapter {
     }
 
 
-    static class GitInfo {
-        GitInfo(String url, String branch, String commit) {
-            this.url = url;
-            this.branch = branch;
-            this.commit = commit;
+    static class GenericBuildRepository {
+        String owner_name;
+        String name;
+
+        GenericBuildRepository(String owner_name, String name) {
+            this.owner_name = owner_name;
+            this.name = name;
         }
 
-        final String url;
-        final String branch;
-        final String commit;
+        static GenericBuildRepository fromUrl(String url) {
+            String[] components = url.split("/");
+            String repoName = components[components.length - 1];
+            String ownerName = components[components.length - 2];
+            return new GenericBuildRepository(ownerName, repoName);
+        }
+
     }
 
     static class BuildReport {
-        private static String PHASE_STARTED = "STARTED";
-        private static String PHASE_FINALIZED = "FINALIZED";
+        private static String TYPE_PULL_REQUEST = "pull_request";
+        private static String TYPE_PUSH = "push";
+        private static String TYPE_TAG = "tag";
+        private static String TYPE_MANUAL = "manual";
+        private static String TYPE_CRON = "cron";
 
-        private static String STATUS_STARTED = "STARTED";
-        private static String STATUS_FAILURE = "FAILURE";
-        private static String STATUS_SUCCESS = "SUCCESS";
+        private static String STATUS_STARTED = "started";
+        private static String STATUS_FAILURE = "failed";
+        private static String STATUS_ERROR = "error";
+        private static String STATUS_SUCCESS = "passed";
+        private static String STATUS_CANCELED = "canceled";
 
-        BuildReport(String number, String phase, String status, String full_url, GitInfo scm) {
+        BuildReport(String buildId,
+                    String name,
+                    int number,
+                    String type,
+                    Integer pull_request_number, // if type = pull request
+                    String branch, // if type = push
+                    String build_url,
+                    String status,
+                    String sha,
+                    GenericBuildRepository repository) {
+            if(type.equals(TYPE_PULL_REQUEST) && pull_request_number == null) {
+                throw new RuntimeException("Pull request builds require a PR number");
+            }
+
+            if(type.equals(TYPE_PUSH) && branch == null) {
+                throw new RuntimeException("Push builds require a branch");
+            }
+            this.id = buildId;
             this.number = number;
-            this.phase = phase;
-            this.status = status;
-            this.full_url = full_url;
-            this.scm = scm;
-        }
-
-        String number;
-        String phase;
-        String status;
-        String full_url;
-        GitInfo scm;
-    }
-
-    static class AtomistWebhookPayload {
-
-        AtomistWebhookPayload(String name, long duration, BuildReport build) {
             this.name = name;
-            this.duration = duration;
-            this.build = build;
+            this.pull_request_number = pull_request_number;
+            this.build_url = build_url;
+            this.status = status;
+            this.repository = repository;
+            this.commit = sha;
+            this.type = type;
+            this.branch = branch;
         }
 
+        String id;
+        String type;
+        int number;
         String name;
-        long duration;
-        BuildReport build;
+        Integer pull_request_number;
+        String build_url;
+        String status;
+        String commit;
+        // choosing not to populate: tag
+        String branch;
+        String provider = "TeamCity";
+        GenericBuildRepository repository;
     }
+
 }

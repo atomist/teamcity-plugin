@@ -40,4 +40,23 @@ Send at least these events: Build fails (don't check the "only notify... boxes")
 
 Currently this plugin sends some output to stdout, so check TeamCity server's `catalina.out` to see what it's sending, or to look for exceptions.
 
+## To develop on this plugin:
+
+(mostly reminders to myself)
+
+Local TeamCity install; start it up with `TeamCity/bin/runAll.sh start` (the directory where it unzipped).
+
+It runs on localhost:8111
+
+`mvn package`
+
+`cp target/* ~/.BuildServer/plugins` 
+
+restart TeamCity; `runAll.sh stop; runAll.sh start`
+
+Make a build go.
+
+Check `TeamCity/logs/catalina.out`
+
+
 Copyright 2018 Atomist
