@@ -91,6 +91,8 @@ public class AtomistNotifier extends NotificatorAdapter {
             // Gather data out of the build.
             int buildNumber = Integer.parseInt(build.getBuildNumber());
 
+            build.getTriggeredBy().getParameters().forEach((k, v) -> say("triggering parameter: " + k + "=" + v)) ;
+
             String buildUrl = constructBuildUrl(baseUrl, build);
 
             List<BuildRevision> revisions = build.getRevisions();
@@ -101,19 +103,24 @@ public class AtomistNotifier extends NotificatorAdapter {
             BuildRevision revision = revisions.get(0);
 
             String teamCityBranchName = getFullBranch(build, revision.getRoot());
-            String buildTrigger = teamCityBranchName.contains("pulls") ? BuildReport.TYPE_PULL_REQUEST : BuildReport.TYPE_PUSH;
-            Integer prNumber = buildTrigger.equals(BuildReport.TYPE_PULL_REQUEST) ? Integer.parseInt(stripBranchPrefixes(teamCityBranchName)) : null;
+            say("The full branch is: " + teamCityBranchName);
+            String buildTrigger = isPullRequest(teamCityBranchName) ? BuildReport.TYPE_PULL_REQUEST : BuildReport.TYPE_PUSH;
+            Integer prNumber = buildTrigger.equals(BuildReport.TYPE_PULL_REQUEST) ? parsePullRequestNumber(teamCityBranchName) : null;
             String branch = buildTrigger.equals(BuildReport.TYPE_PUSH) ? stripBranchPrefixes(teamCityBranchName) : null;
             String sha = revision.getRevision();
             String buildName = build.getBuildTypeExternalId();
             String buildId = "" + build.getBuildId();
 
+            String comment = build.getBuildComment() == null ? null : build.getBuildComment().getComment();
+            say("build comment: " + comment);
+
 
             // Put it all together
 
             GenericBuildRepository scm = GenericBuildRepository.fromUrl(getRepoUrl(revision.getRoot()));
+            ExtraData extraData = new ExtraData(comment);
             BuildReport buildPayload = new BuildReport(buildId, buildName, buildNumber, buildTrigger,
-                    prNumber, branch, buildUrl, status, sha, scm);
+                    prNumber, branch, buildUrl, status, sha, scm, extraData);
 
             // serialize
             Gson gson = new Gson();
@@ -166,7 +173,7 @@ public class AtomistNotifier extends NotificatorAdapter {
 //        say("The vcsRoot branch is: " + vcsRoot.getProperty("branch"));
 //        say("the build branch is: " + build.getBranch().getName());
 
-        vcsRoot.getProperties().forEach((k,v) -> say(k + "=" + v));
+     //   vcsRoot.getProperties().forEach((k,v) -> say(k + "=" + v));
         if (build.getBranch().isDefaultBranch()) {
             if (vcsRoot.getProperty("branch") == null) {
                 say("Warning: no branch property on vcsRoot " + vcsRoot.getName());
@@ -181,6 +188,21 @@ public class AtomistNotifier extends NotificatorAdapter {
         return fullBranch
                 .replaceFirst("^refs/heads/", "")
                 .replaceFirst("^refs/pull/", "");
+    }
+
+    private boolean isPullRequest(String fullBranch) {
+        return fullBranch.startsWith("refs/pull/") || fullBranch.endsWith("/merge");
+    }
+
+    private Integer parsePullRequestNumber(String fullBranch) {
+        String withoutPrefix = stripBranchPrefixes(fullBranch);
+        String numberPart = withoutPrefix.split("/")[0];
+        try {
+            return Integer.parseInt(numberPart);
+        } catch (NumberFormatException nfe) {
+            say("ERROR: Could not parse PR number from " + fullBranch + " because <" + numberPart + "> is not an int");
+            return 0;
+        }
     }
 
     private String getRepoUrl(VcsRootInstance vcsRoot) {
@@ -214,6 +236,15 @@ public class AtomistNotifier extends NotificatorAdapter {
 
     }
 
+    static class ExtraData {
+        String comment;
+
+        ExtraData(String comment) {
+            this.comment = comment;
+        }
+
+    }
+
     static class BuildReport {
         private static String TYPE_PULL_REQUEST = "pull_request";
         private static String TYPE_PUSH = "push";
@@ -236,7 +267,8 @@ public class AtomistNotifier extends NotificatorAdapter {
                     String build_url,
                     String status,
                     String sha,
-                    GenericBuildRepository repository) {
+                    GenericBuildRepository repository,
+                    ExtraData data) {
             if(type.equals(TYPE_PULL_REQUEST) && pull_request_number == null) {
                 throw new RuntimeException("Pull request builds require a PR number");
             }
@@ -254,6 +286,7 @@ public class AtomistNotifier extends NotificatorAdapter {
             this.commit = sha;
             this.type = type;
             this.branch = branch;
+            this.data = data;
         }
 
         String id;
@@ -268,6 +301,7 @@ public class AtomistNotifier extends NotificatorAdapter {
         String branch;
         String provider = "TeamCity";
         GenericBuildRepository repository;
+        ExtraData data;
     }
 
 }
