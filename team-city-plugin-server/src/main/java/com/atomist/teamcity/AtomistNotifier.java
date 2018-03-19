@@ -110,6 +110,7 @@ public class AtomistNotifier extends NotificatorAdapter {
             String sha = revision.getRevision();
             String buildName = build.getBuildTypeExternalId();
             String buildId = "" + build.getBuildId();
+            String branchDisplayName = build.getBranch().getDisplayName();
 
             String comment = build.getBuildComment() == null ? null : build.getBuildComment().getComment();
             say("build comment: " + comment);
@@ -118,7 +119,7 @@ public class AtomistNotifier extends NotificatorAdapter {
             // Put it all together
 
             GenericBuildRepository scm = GenericBuildRepository.fromUrl(getRepoUrl(revision.getRoot()));
-            ExtraData extraData = new ExtraData(comment);
+            ExtraData extraData = new ExtraData(comment, branchDisplayName);
             BuildReport buildPayload = new BuildReport(buildId, buildName, buildNumber, buildTrigger,
                     prNumber, branch, buildUrl, status, sha, scm, extraData);
 
@@ -238,9 +239,11 @@ public class AtomistNotifier extends NotificatorAdapter {
 
     static class ExtraData {
         String comment;
+        String branchDisplayName;
 
-        ExtraData(String comment) {
+        ExtraData(String comment, String branchDisplayName) {
             this.comment = comment;
+            this.branchDisplayName = branchDisplayName;
         }
 
     }
