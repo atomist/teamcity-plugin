@@ -110,7 +110,7 @@ public class AtomistNotifier extends NotificatorAdapter {
             String sha = revision.getRevision();
             String buildName = build.getBuildTypeExternalId();
             String buildId = "" + build.getBuildId();
-            String branchDisplayName = build.getBranch().getDisplayName();
+            String branchDisplayName = build.getBranch() == null ? null : build.getBranch().getDisplayName();
 
             String comment = build.getBuildComment() == null ? null : build.getBuildComment().getComment();
             say("build comment: " + comment);
@@ -119,7 +119,7 @@ public class AtomistNotifier extends NotificatorAdapter {
             // Put it all together
 
             GenericBuildRepository scm = GenericBuildRepository.fromUrl(getRepoUrl(revision.getRoot()));
-            ExtraData extraData = new ExtraData(comment, branchDisplayName);
+            ExtraData extraData = new ExtraData(comment, branchDisplayName, status == BuildReport.STATUS_ERROR);
             BuildReport buildPayload = new BuildReport(buildId, buildName, buildNumber, buildTrigger,
                     prNumber, branch, buildUrl, status, sha, scm, extraData);
 
@@ -175,6 +175,11 @@ public class AtomistNotifier extends NotificatorAdapter {
 //        say("the build branch is: " + build.getBranch().getName());
 
      //   vcsRoot.getProperties().forEach((k,v) -> say(k + "=" + v));
+
+        if (build.getBranch() == null) {
+            return null;
+        }
+
         if (build.getBranch().isDefaultBranch()) {
             if (vcsRoot.getProperty("branch") == null) {
                 say("Warning: no branch property on vcsRoot " + vcsRoot.getName());
@@ -186,16 +191,25 @@ public class AtomistNotifier extends NotificatorAdapter {
     }
 
     private String stripBranchPrefixes(String fullBranch) {
+        if (fullBranch == null) {
+            return "mystery-branch";
+        }
         return fullBranch
                 .replaceFirst("^refs/heads/", "")
                 .replaceFirst("^refs/pull/", "");
     }
 
     private boolean isPullRequest(String fullBranch) {
+        if (fullBranch == null) {
+            return false;
+        }
         return fullBranch.startsWith("refs/pull/") || fullBranch.endsWith("/merge");
     }
 
     private Integer parsePullRequestNumber(String fullBranch) {
+        if (fullBranch == null) {
+            return null;
+        }
         String withoutPrefix = stripBranchPrefixes(fullBranch);
         String numberPart = withoutPrefix.split("/")[0];
         try {
@@ -240,10 +254,12 @@ public class AtomistNotifier extends NotificatorAdapter {
     static class ExtraData {
         String comment;
         String branchDisplayName;
+        boolean failedToStart;
 
-        ExtraData(String comment, String branchDisplayName) {
+        ExtraData(String comment, String branchDisplayName, boolean failedToStart) {
             this.comment = comment;
             this.branchDisplayName = branchDisplayName;
+            this.failedToStart = failedToStart;
         }
 
     }
