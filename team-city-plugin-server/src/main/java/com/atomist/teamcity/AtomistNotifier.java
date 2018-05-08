@@ -160,7 +160,7 @@ public class AtomistNotifier extends NotificatorAdapter {
         say("revision root description: " + r.getRoot().getDescription());
         say("revision root properties: ");
         r.getRoot().getProperties().forEach((k, v) -> say(k + " = " + v));
-        
+
         say("revision root parent external id: " + r.getRoot().getParent().getExternalId());
         say("revision root parent properties: ");
         r.getRoot().getParent().getProperties().forEach((k, v) -> say(k + " = " + v));
@@ -181,8 +181,8 @@ public class AtomistNotifier extends NotificatorAdapter {
         say("build type name " + build.getBuildTypeName());
         say("build full name " + build.getFullName());
         say("build description" + build.getBuildDescription());
-        say("build branch name" + build.getBranch().getName());
-        say("build branch display name" + build.getBranch().getDisplayName());
+        say("build branch name" + (build.getBranch() == null ? "doh branch is null" : build.getBranch().getName()));
+        say("build branch display name" + (build.getBranch() == null ? "doh branch is null" : build.getBranch().getDisplayName());
         say("build agent name" + build.getAgentName());
 
         String buildType = build.getBuildTypeExternalId(); // Finally found it!
@@ -195,12 +195,13 @@ public class AtomistNotifier extends NotificatorAdapter {
      */
     private String getFullBranch(SBuild build, VcsRootInstance vcsRoot) {
         say("The vcsRoot branch is: " + vcsRoot.getProperty("branch"));
-        say("the build branch is: " + build.getBranch().getName());
+        say("the build branch is: " + (build.getBranch() == null ? " null" : build.getBranch().getName()));
 
+        say("VCS Root properties:");
         vcsRoot.getProperties().forEach((k, v) -> say(k + "=" + v));
 
         if (build.getBranch() == null) {
-            return null;
+            return vcsRoot.getProperty("branch", "master");
         }
 
         if (build.getBranch().isDefaultBranch()) {
