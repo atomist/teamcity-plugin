@@ -61,7 +61,7 @@ public class AtomistNotifier extends NotificatorAdapter {
 
     @Override
     public void notifyBuildFailed(@NotNull SRunningBuild build, @NotNull Set<SUser> users) {
-        sendAtomistWebhook(build, users,BuildReport.STATUS_FAILURE);
+        sendAtomistWebhook(build, users, BuildReport.STATUS_FAILURE);
     }
 
     @Override
@@ -91,76 +91,99 @@ public class AtomistNotifier extends NotificatorAdapter {
             // Gather data out of the build.
             int buildNumber = Integer.parseInt(build.getBuildNumber());
 
-            build.getTriggeredBy().getParameters().forEach((k, v) -> say("triggering parameter: " + k + "=" + v)) ;
+            build.getTriggeredBy().getParameters().forEach((k, v) -> say("triggering parameter: " + k + "=" + v));
 
             String buildUrl = constructBuildUrl(baseUrl, build);
 
             List<BuildRevision> revisions = build.getRevisions();
-            if (revisions.size() != 1) {
-                say("Skipping: Expected 1 revision, saw " + revisions.size() + " on " + buildUrl);
-                return;
-            }
-            BuildRevision revision = revisions.get(0);
+            revisions.forEach((revision) -> {
+                say("Sending for revision: " + revision.getRevisionDisplayName());
+                printStuffAboutTheRevision(revision);
 
-            String teamCityBranchName = getFullBranch(build, revision.getRoot());
-            say("The full branch is: " + teamCityBranchName);
-            String buildTrigger = isPullRequest(teamCityBranchName) ? BuildReport.TYPE_PULL_REQUEST : BuildReport.TYPE_PUSH;
-            Integer prNumber = buildTrigger.equals(BuildReport.TYPE_PULL_REQUEST) ? parsePullRequestNumber(teamCityBranchName) : null;
-            String branch = buildTrigger.equals(BuildReport.TYPE_PUSH) ? stripBranchPrefixes(teamCityBranchName) : null;
-            String sha = revision.getRevision();
-            String buildName = build.getBuildTypeExternalId();
-            String buildId = "" + build.getBuildId();
-            String branchDisplayName = build.getBranch() == null ? null : build.getBranch().getDisplayName();
+                String teamCityBranchName = getFullBranch(build, revision.getRoot());
+                say("The full branch is: " + teamCityBranchName);
+                String buildTrigger = isPullRequest(teamCityBranchName) ? BuildReport.TYPE_PULL_REQUEST : BuildReport.TYPE_PUSH;
+                Integer prNumber = buildTrigger.equals(BuildReport.TYPE_PULL_REQUEST) ? parsePullRequestNumber(teamCityBranchName) : null;
+                String branch = buildTrigger.equals(BuildReport.TYPE_PUSH) ? stripBranchPrefixes(teamCityBranchName) : null;
+                String sha = revision.getRevision();
+                String buildName = build.getBuildTypeExternalId();
+                String buildId = "" + build.getBuildId();
+                String branchDisplayName = build.getBranch() == null ? null : build.getBranch().getDisplayName();
 
-            String comment = build.getBuildComment() == null ? null : build.getBuildComment().getComment();
-            say("build comment: " + comment);
+                String comment = build.getBuildComment() == null ? null : build.getBuildComment().getComment();
+                say("build comment: " + comment);
 
 
-            // Put it all together
+                // Put it all together
 
-            GenericBuildRepository scm = GenericBuildRepository.fromUrl(getRepoUrl(revision.getRoot()));
-            ExtraData extraData = new ExtraData(comment, branchDisplayName, status == BuildReport.STATUS_ERROR);
-            BuildReport buildPayload = new BuildReport(buildId, buildName, buildNumber, buildTrigger,
-                    prNumber, branch, buildUrl, status, sha, scm, extraData);
+                GenericBuildRepository scm = GenericBuildRepository.fromUrl(getRepoUrl(revision.getRoot()));
+                ExtraData extraData = new ExtraData(comment, branchDisplayName, status == BuildReport.STATUS_ERROR);
+                BuildReport buildPayload = new BuildReport(buildId, buildName, buildNumber, buildTrigger,
+                        prNumber, branch, buildUrl, status, sha, scm, extraData);
 
-            // serialize
-            Gson gson = new Gson();
-            String jsonPayload = gson.toJson(buildPayload);
-            say("Sending to atomist: " + jsonPayload);
+                // serialize
+                Gson gson = new Gson();
+                String jsonPayload = gson.toJson(buildPayload);
+                say("Sending to atomist: " + jsonPayload);
 
-            // transmit
-            try {
-                String atomistUrl = ATOMIST_BASE_URL + teamId;
-                say("url: " + atomistUrl);
-                HttpPost httpPost = new HttpPost(atomistUrl);
+                // transmit
+                try {
+                    String atomistUrl = ATOMIST_BASE_URL + teamId;
+                    say("url: " + atomistUrl);
+                    HttpPost httpPost = new HttpPost(atomistUrl);
 
-                StringEntity entity = new StringEntity(jsonPayload);
-                httpPost.setEntity(entity);
-                httpPost.setHeader("Accept", "application/json");
-                httpPost.setHeader("Content-type", "application/json");
+                    StringEntity entity = new StringEntity(jsonPayload);
+                    httpPost.setEntity(entity);
+                    httpPost.setHeader("Accept", "application/json");
+                    httpPost.setHeader("Content-type", "application/json");
 
-                CloseableHttpResponse response = client.execute(httpPost);
-                say(EntityUtils.toString(response.getEntity()));
-                client.close();
-            } catch (IOException e) {
-                System.out.println("IO exception when posting" + e.getMessage());
-                e.printStackTrace();
-            }
+                    CloseableHttpResponse response = client.execute(httpPost);
+                    say(EntityUtils.toString(response.getEntity()));
+                    client.close();
+                } catch (IOException e) {
+                    System.out.println("IO exception when posting" + e.getMessage());
+                    e.printStackTrace();
+                }
+            });
         });
+    }
+
+    private void printStuffAboutTheRevision(BuildRevision r) {
+        say("revision display name: " + r.getRevisionDisplayName());
+        say("revision: " + r.getRevision());
+        say("revision repository version display version: " + r.getRepositoryVersion().getDisplayVersion());
+        say("revision repository version vcs branch: " + r.getRepositoryVersion().getVcsBranch());
+        say("revision repository version version: " + r.getRepositoryVersion().getVersion());
+
+        say("revision root vcs name: " + r.getRoot().getVcsName());
+        say("revision root vcs display name: " + r.getRoot().getVcsDisplayName());
+        say("revision root description: " + r.getRoot().getDescription());
+        say("revision root properties: ");
+        r.getRoot().getProperties().forEach((k, v) -> say(k + " = " + v));
+        
+        say("revision root parent external id: " + r.getRoot().getParent().getExternalId());
+        say("revision root parent properties: ");
+        r.getRoot().getParent().getProperties().forEach((k, v) -> say(k + " = " + v));
+
+        say("revision entry signature: " + r.getEntry().getSignature());
+        say("revision entry display name: " + r.getEntry().getDisplayName());
+        say("revision entry checkout rules spec: " + r.getEntry().getCheckoutRulesSpecification());
+        say("entry properties: "); r.getEntry().getProperties().forEach((k, v) -> say(k + " = " + v));
+
     }
 
     private String constructBuildUrl(String baseUrl, SBuild build) {
         long buildId = build.getBuildId();
-//        say("extended full name: " + build.getBuildType().getExtendedFullName());
-//        say("full name: " + build.getBuildType().getFullName());
-//        say("extended name: " + build.getBuildType().getExtendedName());
-//        say("build type ID " + build.getBuildTypeId());
-//        say("build type name " + build.getBuildTypeName());
-//        say("build full name " + build.getFullName());
-//        say("build description" + build.getBuildDescription());
-//        say("build branch name" + build.getBranch().getName());
-//        say("build branch display name" + build.getBranch().getDisplayName());
-//        say("build agent name" + build.getAgentName());
+        say("extended full name: " + build.getBuildType().getExtendedFullName());
+        say("full name: " + build.getBuildType().getFullName());
+        say("extended name: " + build.getBuildType().getExtendedName());
+        say("build type ID " + build.getBuildTypeId());
+        say("build type name " + build.getBuildTypeName());
+        say("build full name " + build.getFullName());
+        say("build description" + build.getBuildDescription());
+        say("build branch name" + build.getBranch().getName());
+        say("build branch display name" + build.getBranch().getDisplayName());
+        say("build agent name" + build.getAgentName());
 
         String buildType = build.getBuildTypeExternalId(); // Finally found it!
 
@@ -171,10 +194,10 @@ public class AtomistNotifier extends NotificatorAdapter {
      * Guess the branch name. Might be like /refs/heads/master or /refs/pull/25/merge or might be shorter.
      */
     private String getFullBranch(SBuild build, VcsRootInstance vcsRoot) {
-//        say("The vcsRoot branch is: " + vcsRoot.getProperty("branch"));
-//        say("the build branch is: " + build.getBranch().getName());
+        say("The vcsRoot branch is: " + vcsRoot.getProperty("branch"));
+        say("the build branch is: " + build.getBranch().getName());
 
-     //   vcsRoot.getProperties().forEach((k,v) -> say(k + "=" + v));
+        vcsRoot.getProperties().forEach((k, v) -> say(k + "=" + v));
 
         if (build.getBranch() == null) {
             return null;
@@ -192,6 +215,7 @@ public class AtomistNotifier extends NotificatorAdapter {
 
     private String stripBranchPrefixes(String fullBranch) {
         if (fullBranch == null) {
+            say("I could not find the full branch at all");
             return "mystery-branch";
         }
         return fullBranch
@@ -288,11 +312,11 @@ public class AtomistNotifier extends NotificatorAdapter {
                     String sha,
                     GenericBuildRepository repository,
                     ExtraData data) {
-            if(type.equals(TYPE_PULL_REQUEST) && pull_request_number == null) {
+            if (type.equals(TYPE_PULL_REQUEST) && pull_request_number == null) {
                 throw new RuntimeException("Pull request builds require a PR number");
             }
 
-            if(type.equals(TYPE_PUSH) && branch == null) {
+            if (type.equals(TYPE_PUSH) && branch == null) {
                 throw new RuntimeException("Push builds require a branch");
             }
             this.id = buildId;
