@@ -77,6 +77,7 @@ public class AtomistNotifier extends NotificatorAdapter {
     private void sendAtomistWebhook(@NotNull SRunningBuild build, @NotNull Set<SUser> users,
                                     String status) {
         users.forEach((user) -> {
+            say("----------------- ATOMIST SAYS --------------------");
             say("Hello Notificator World, specifically " + user.getUsername());
             CloseableHttpClient client = HttpClients.createDefault();
 
@@ -97,7 +98,7 @@ public class AtomistNotifier extends NotificatorAdapter {
 
             List<BuildRevision> revisions = build.getRevisions();
             revisions.forEach((revision) -> {
-                say("Sending for revision: " + revision.getRevisionDisplayName());
+                say("-------------- Sending for revision: " + revision.getRevisionDisplayName());
                 printStuffAboutTheRevision(revision);
 
                 String teamCityBranchName = getFullBranch(build, revision.getRoot());
@@ -177,13 +178,13 @@ public class AtomistNotifier extends NotificatorAdapter {
         say("extended full name: " + build.getBuildType().getExtendedFullName());
         say("full name: " + build.getBuildType().getFullName());
         say("extended name: " + build.getBuildType().getExtendedName());
-        say("build type ID " + build.getBuildTypeId());
-        say("build type name " + build.getBuildTypeName());
-        say("build full name " + build.getFullName());
-        say("build description" + build.getBuildDescription());
-        say("build branch name" + (build.getBranch() == null ? "doh branch is null" : build.getBranch().getName()));
-        say("build branch display name" + (build.getBranch() == null ? "doh branch is null" : build.getBranch().getDisplayName());
-        say("build agent name" + build.getAgentName());
+        say("build type ID: " + build.getBuildTypeId());
+        say("build type name: " + build.getBuildTypeName());
+        say("build full name: " + build.getFullName());
+        say("build description: " + build.getBuildDescription());
+        say("build branch name: " + (build.getBranch() == null ? "doh branch is null" : build.getBranch().getName()));
+        say("build branch display name: " + (build.getBranch() == null ? "doh branch is null" : build.getBranch().getDisplayName()));
+        say("build agent name: " + build.getAgentName());
 
         String buildType = build.getBuildTypeExternalId(); // Finally found it!
 
@@ -269,7 +270,7 @@ public class AtomistNotifier extends NotificatorAdapter {
 
         static GenericBuildRepository fromUrl(String url) {
             String[] components = url.split("/");
-            String repoName = components[components.length - 1];
+            String repoName = components[components.length - 1].replace(".git", "");
             String ownerName = components[components.length - 2];
             return new GenericBuildRepository(ownerName, repoName);
         }
