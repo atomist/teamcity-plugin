@@ -20,6 +20,7 @@ import org.apache.http.util.EntityUtils;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -79,7 +80,6 @@ public class AtomistNotifier extends NotificatorAdapter {
         users.forEach((user) -> {
             say("----------------- ATOMIST SAYS --------------------");
             say("Hello Notificator World, specifically " + user.getUsername());
-            CloseableHttpClient client = HttpClients.createDefault();
 
             // gather settings from where the user activated the notification. To change these in TC:
             // click on my name; click Notification Rules on the left nav;
@@ -128,25 +128,54 @@ public class AtomistNotifier extends NotificatorAdapter {
                 say("Sending to atomist: " + jsonPayload);
 
                 // transmit
+                String atomistUrl = ATOMIST_BASE_URL + teamId;
+                say("url: " + atomistUrl);
+                HttpPost httpPost = new HttpPost(atomistUrl);
+
+                StringEntity entity = null;
                 try {
-                    String atomistUrl = ATOMIST_BASE_URL + teamId;
-                    say("url: " + atomistUrl);
-                    HttpPost httpPost = new HttpPost(atomistUrl);
+                    entity = new StringEntity(jsonPayload);
+                } catch (UnsupportedEncodingException e) {
+                    throw new RuntimeException(e);
+                }
+                httpPost.setEntity(entity);
+                httpPost.setHeader("Accept", "application/json");
+                httpPost.setHeader("Content-type", "application/json");
 
-                    StringEntity entity = new StringEntity(jsonPayload);
-                    httpPost.setEntity(entity);
-                    httpPost.setHeader("Accept", "application/json");
-                    httpPost.setHeader("Content-type", "application/json");
 
-                    CloseableHttpResponse response = client.execute(httpPost);
-                    say(EntityUtils.toString(response.getEntity()));
-                    client.close();
+                try (CloseableHttpClient client = HttpClients.createMinimal()) { // should this be class-level? or static?
+                    withFeebleRetry(() -> {
+                        try {
+                            CloseableHttpResponse response = client.execute(httpPost);
+                            say(EntityUtils.toString(response.getEntity()));
+                            response.close();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
                 } catch (IOException e) {
-                    System.out.println("IO exception when posting" + e.getMessage());
                     e.printStackTrace();
                 }
             });
         });
+    }
+
+    private void withFeebleRetry(Runnable f) {
+        try {
+            f.run();
+        } catch (Exception e) {
+            say("oh look a nasty exception: " + e.getMessage());
+            sleepForOneSecond();
+            f.run(); // don't catch this time, let it go
+        }
+    }
+
+    private void sleepForOneSecond() {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e1) {
+            throw new RuntimeException(e1);
+        }
     }
 
     private void printStuffAboutTheRevision(BuildRevision r) {
@@ -169,7 +198,8 @@ public class AtomistNotifier extends NotificatorAdapter {
         say("revision entry signature: " + r.getEntry().getSignature());
         say("revision entry display name: " + r.getEntry().getDisplayName());
         say("revision entry checkout rules spec: " + r.getEntry().getCheckoutRulesSpecification());
-        say("entry properties: "); r.getEntry().getProperties().forEach((k, v) -> say(k + " = " + v));
+        say("entry properties: ");
+        r.getEntry().getProperties().forEach((k, v) -> say(k + " = " + v));
 
     }
 
