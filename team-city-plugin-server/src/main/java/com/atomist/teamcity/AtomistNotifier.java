@@ -143,39 +143,14 @@ public class AtomistNotifier extends NotificatorAdapter {
                 httpPost.setHeader("Content-type", "application/json");
 
 
-                try (CloseableHttpClient client = HttpClients.createMinimal()) { // should this be class-level? or static?
-                    withFeebleRetry(() -> {
-                        try {
-                            CloseableHttpResponse response = client.execute(httpPost);
-                            say(EntityUtils.toString(response.getEntity()));
-                            response.close();
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
+                try (CloseableHttpClient client = HttpClients.createMinimal();
+                     CloseableHttpResponse response = client.execute(httpPost)) {
+                    say(EntityUtils.toString(response.getEntity()));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             });
         });
-    }
-
-    private void withFeebleRetry(Runnable f) {
-        try {
-            f.run();
-        } catch (Exception e) {
-            say("oh look a nasty exception: " + e.getMessage());
-            sleepForOneSecond();
-            f.run(); // don't catch this time, let it go
-        }
-    }
-
-    private void sleepForOneSecond() {
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException e1) {
-            throw new RuntimeException(e1);
-        }
     }
 
     private void printStuffAboutTheRevision(BuildRevision r) {
