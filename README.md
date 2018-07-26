@@ -36,6 +36,24 @@ note: I experienced some trickiness getting to "all branches"... I had to narrow
 
 Send at least these events: Build fails (don't check the "only notify... boxes"); Build is successful; Build starts; and Build fails to start.
 
+#### Log setup
+
+To put this plugin's logs in teamcity-atomist.log, add the following to teamcity-server-log4j.xml (or to your logging config if you've changed the default)
+
+```
+     <appender name="ROLL.ATOMIST" class="jetbrains.buildServer.util.TCRollingFileAppender">
+       <param name="file" value="${teamcity_logs}/teamcity-atomist.log" />
+       <param name="maxBackupIndex" value="20" />
+       <layout class="org.apache.log4j.PatternLayout">
+         <param name="ConversionPattern" value="[%d] %6p - %m %n" />
+       </layout>
+     </appender>
+      <category name="com.atomist" additivity="false">
+       <priority value="DEBUG" />
+       <appender-ref ref="ROLL.ATOMIST" />
+     </category>
+```
+
 ### Debug
 
 Currently this plugin sends some output to stdout, so check TeamCity server's `catalina.out` to see what it's sending, or to look for exceptions.
@@ -57,6 +75,12 @@ restart TeamCity; `runAll.sh stop; runAll.sh start`
 Make a build go.
 
 Check `TeamCity/logs/catalina.out`
+
+## Release
+
+Make a GitHub release
+
+upload the .zip from target/
 
 
 Copyright 2018 Atomist
