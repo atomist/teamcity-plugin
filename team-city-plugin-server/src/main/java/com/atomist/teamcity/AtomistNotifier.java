@@ -119,8 +119,18 @@ public class AtomistNotifier extends NotificatorAdapter {
 
                 GenericBuildRepository scm = GenericBuildRepository.fromUrl(getRepoUrl(revision.getRoot()));
                 ExtraData extraData = new ExtraData(comment, branchDisplayName, status == BuildReport.STATUS_ERROR);
-                BuildReport buildPayload = new BuildReport(buildId, buildName, buildNumber, buildTrigger,
-                        prNumber, branch, buildUrl, status, sha, scm, extraData);
+                BuildReport buildPayload = new BuildReport(
+                        buildId,
+                        buildName,
+                        buildNumber,
+                        buildTrigger,
+                        prNumber,
+                        branch,
+                        buildUrl,
+                        status,
+                        sha,
+                        scm,
+                        extraData);
 
                 // serialize
                 Gson gson = new Gson();
@@ -234,7 +244,9 @@ public class AtomistNotifier extends NotificatorAdapter {
         if (fullBranch == null) {
             return false;
         }
-        return fullBranch.startsWith("refs/pull/") || fullBranch.endsWith("/merge");
+        return fullBranch.startsWith("refs/pull/")
+                || fullBranch.endsWith("/merge")
+                || fullBranch.contains("merge-requests"); // gitlab
     }
 
     private Integer parsePullRequestNumber(String fullBranch) {
