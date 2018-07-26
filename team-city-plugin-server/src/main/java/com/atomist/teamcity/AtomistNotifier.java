@@ -79,7 +79,7 @@ public class AtomistNotifier extends NotificatorAdapter {
                                     String status) {
         users.forEach((user) -> {
             say("----------------- ATOMIST SAYS --------------------");
-            say("Hello Notificator World, specifically " + user.getUsername());
+            say("Hello from build " + build.getBuildId() + ", thanks to " + user.getUsername());
 
             // gather settings from where the user activated the notification. To change these in TC:
             // click on my name; click Notification Rules on the left nav;
