@@ -107,7 +107,7 @@ public class AtomistNotifier extends NotificatorAdapter {
                 Integer prNumber = buildTrigger.equals(BuildReport.TYPE_PULL_REQUEST) ? parsePullRequestNumber(teamCityBranchName) : null;
                 String branch = buildTrigger.equals(BuildReport.TYPE_PUSH) ? stripBranchPrefixes(teamCityBranchName) : null;
                 String sha = revision.getRevision();
-                String buildName = build.getBuildTypeExternalId();
+                String buildName = build.getFullName();
                 String buildId = "" + build.getBuildId();
                 String branchDisplayName = build.getBranch() == null ? null : build.getBranch().getDisplayName();
 
@@ -118,7 +118,11 @@ public class AtomistNotifier extends NotificatorAdapter {
                 // Put it all together
 
                 GenericBuildRepository scm = GenericBuildRepository.fromUrl(getRepoUrl(revision.getRoot()));
-                ExtraData extraData = new ExtraData(comment, branchDisplayName, status == BuildReport.STATUS_ERROR);
+                ExtraData extraData = new ExtraData(
+                        comment,
+                        branchDisplayName,
+                        status == BuildReport.STATUS_ERROR,
+                        build.getBuildTypeExternalId());
                 BuildReport buildPayload = new BuildReport(
                         buildId,
                         buildName,
@@ -298,11 +302,13 @@ public class AtomistNotifier extends NotificatorAdapter {
         String comment;
         String branchDisplayName;
         boolean failedToStart;
+        String buildTypeExternalId;
 
-        ExtraData(String comment, String branchDisplayName, boolean failedToStart) {
+        ExtraData(String comment, String branchDisplayName, boolean failedToStart, String buildTypeExternalId) {
             this.comment = comment;
             this.branchDisplayName = branchDisplayName;
             this.failedToStart = failedToStart;
+            this.buildTypeExternalId = buildTypeExternalId;
         }
 
     }
