@@ -89,8 +89,8 @@ public class AtomistNotifier extends NotificatorAdapter {
             say("Team ID:" + teamId);
             say("Base URL:" + baseUrl);
 
-            // Gather data out of the build.
-            int buildNumber = Integer.parseInt(build.getBuildNumber());
+            String buildNumber = build.getBuildNumber();
+            say("Build number: " + buildNumber);
 
             build.getTriggeredBy().getParameters().forEach((k, v) -> say("triggering parameter: " + k + "=" + v));
 
@@ -114,7 +114,6 @@ public class AtomistNotifier extends NotificatorAdapter {
                 String comment = build.getBuildComment() == null ? null : build.getBuildComment().getComment();
                 say("build comment: " + comment);
 
-
                 // Put it all together
 
                 GenericBuildRepository scm = GenericBuildRepository.fromUrl(getRepoUrl(revision.getRoot()));
@@ -122,11 +121,11 @@ public class AtomistNotifier extends NotificatorAdapter {
                         comment,
                         branchDisplayName,
                         status == BuildReport.STATUS_ERROR,
-                        build.getBuildTypeExternalId());
+                        build.getBuildTypeExternalId(),
+                        buildNumber);
                 BuildReport buildPayload = new BuildReport(
                         buildId,
                         buildName,
-                        buildNumber,
                         buildTrigger,
                         prNumber,
                         branch,
@@ -303,12 +302,14 @@ public class AtomistNotifier extends NotificatorAdapter {
         String branchDisplayName;
         boolean failedToStart;
         String buildTypeExternalId;
+        String buildNumber;
 
-        ExtraData(String comment, String branchDisplayName, boolean failedToStart, String buildTypeExternalId) {
+        ExtraData(String comment, String branchDisplayName, boolean failedToStart, String buildTypeExternalId, String buildNumber) {
             this.comment = comment;
             this.branchDisplayName = branchDisplayName;
             this.failedToStart = failedToStart;
             this.buildTypeExternalId = buildTypeExternalId;
+            this.buildNumber = buildNumber; // FYI: may not be a number, and may change during the build.
         }
 
     }
@@ -328,7 +329,6 @@ public class AtomistNotifier extends NotificatorAdapter {
 
         BuildReport(String buildId,
                     String name,
-                    int number,
                     String type,
                     Integer pull_request_number, // if type = pull request
                     String branch, // if type = push
@@ -345,7 +345,6 @@ public class AtomistNotifier extends NotificatorAdapter {
                 throw new RuntimeException("Push builds require a branch");
             }
             this.id = buildId;
-            this.number = number;
             this.name = name;
             this.pull_request_number = pull_request_number;
             this.build_url = build_url;
@@ -359,7 +358,6 @@ public class AtomistNotifier extends NotificatorAdapter {
 
         String id;
         String type;
-        int number;
         String name;
         Integer pull_request_number;
         String build_url;
