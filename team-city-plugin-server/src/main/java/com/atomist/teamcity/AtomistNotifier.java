@@ -106,6 +106,7 @@ public class AtomistNotifier extends NotificatorAdapter {
                 String buildTrigger = isPullRequest(teamCityBranchName) ? BuildReport.TYPE_PULL_REQUEST : BuildReport.TYPE_PUSH;
                 Integer prNumber = buildTrigger.equals(BuildReport.TYPE_PULL_REQUEST) ? parsePullRequestNumber(teamCityBranchName) : null;
                 String branch = buildTrigger.equals(BuildReport.TYPE_PUSH) ? stripBranchPrefixes(teamCityBranchName) : null;
+
                 String sha = revision.getRevision();
                 String buildName = build.getFullName();
                 String buildId = "" + build.getBuildId();
@@ -120,7 +121,7 @@ public class AtomistNotifier extends NotificatorAdapter {
                 ExtraData extraData = new ExtraData(
                         comment,
                         branchDisplayName,
-                        status == BuildReport.STATUS_ERROR,
+                        status.equals(BuildReport.STATUS_ERROR),
                         build.getBuildTypeExternalId(),
                         buildNumber);
                 BuildReport buildPayload = new BuildReport(
@@ -166,6 +167,12 @@ public class AtomistNotifier extends NotificatorAdapter {
         });
     }
 
+    /*     Each TeamCity build is configured a little differently.
+     *     It is quite difficult to find the correct information
+     *     so here we print EVERYTHING so that we can figure out where to get it.
+     *     Once we have more confidence that every likely situation is covered,
+     *     we will take this out.
+     */
     private void printStuffAboutTheRevision(BuildRevision r) {
         say("revision display name: " + r.getRevisionDisplayName());
         say("revision: " + r.getRevision());
@@ -188,7 +195,6 @@ public class AtomistNotifier extends NotificatorAdapter {
         say("revision entry checkout rules spec: " + r.getEntry().getCheckoutRulesSpecification());
         say("entry properties: ");
         r.getEntry().getProperties().forEach((k, v) -> say(k + " = " + v));
-
     }
 
     private String constructBuildUrl(String baseUrl, SBuild build) {
@@ -274,8 +280,8 @@ public class AtomistNotifier extends NotificatorAdapter {
     }
 
     private void say(String message) {
-        LOG.info(message); // this doesn't work. I have not found the log4j incantation to make it work.
-        System.out.println(message); // this appears in catalina.out in the TC server's log directory
+        LOG.info(message); // this appears in teamcity-atomist.log <-- if you set up log4j as in the README
+        // System.out.println(message); // this appears in catalina.out in the TC server's log directory
     }
 
 

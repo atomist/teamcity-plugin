@@ -74,7 +74,7 @@ restart TeamCity; `runAll.sh stop; runAll.sh start`
 
 Make a build go.
 
-Check `TeamCity/logs/catalina.out`
+Check `TeamCity/logs/catalina.out` and `TeamCity/logs/teamcity-atomist.log`
 
 ## Release
 
